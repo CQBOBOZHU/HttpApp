@@ -1,5 +1,6 @@
 package com.bobozhu.httpapp;
 
+import android.app.Dialog;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -16,6 +17,7 @@ import android.text.InputFilter;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -138,8 +140,11 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
-//        radioGroup.check(R.id.http_protocol);
 
+        initText();
+    }
+
+    private void initText() {
         String params = SharePreferenceUtils.getString("params");
         Gson gson = new Gson();
         if (!TextUtils.isEmpty(params)) {
@@ -293,6 +298,7 @@ public class MainActivity extends AppCompatActivity {
     private void post() {
         Map<String, String> headerMap = getMap(mHeaders);
         Map<String, String> paramMap = getMap(mParams);
+        showLoadingDialog();
         RetrofitUtil.getRetrofit("http://gank.io/").create(Api.class).post(urlTv.getText().toString(), headerMap, paramMap)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -310,16 +316,27 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onNext(ResponseBody o) {
+            stopLoadingDialog();
             try {
                 String s = o.string();
-                responseTv.setText(s);
+                StringBuilder sb = new StringBuilder();
+                sb.append("URL   :" + urlTv.getText().toString());
+                sb.append("\n");
+                sb.append("HEADERS   :" + getMapString(mHeaders));
+                sb.append("\n");
+                sb.append("PARAMS   :" + getMapString(mParams));
+                sb.append("\n");
+                sb.append("ResponseBody   :" + s);
+                responseTv.setText(sb.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
+
         @Override
         public void onError(Throwable t) {
+            stopLoadingDialog();
             Log.v("onNext", t.getLocalizedMessage());
             responseTv.setText("onError: \n LocalizedMessage:" + t.getLocalizedMessage() + "\n Message: " + t.getMessage());
 
@@ -327,6 +344,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onComplete() {
+            stopLoadingDialog();
             Log.v("onComplete", "onComplete");
         }
     };
@@ -339,12 +357,20 @@ public class MainActivity extends AppCompatActivity {
         return map;
     }
 
+    public String getMapString(List<Bean> mList) {
+        StringBuilder sb = new StringBuilder();
+        for (Bean bean : mList) {
+            sb.append(bean.getKey() + "====" + bean.getValue() + "\n");
+        }
+        return sb.toString();
+    }
+
 
     private void get() {
 
         Map<String, String> headerMap = getMap(mHeaders);
         Map<String, String> paramMap = getMap(mParams);
-
+        showLoadingDialog();
         RetrofitUtil.getRetrofit("http://gank.io/").create(Api.class).get(urlTv.getText().toString(), headerMap, paramMap)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -420,5 +446,24 @@ public class MainActivity extends AppCompatActivity {
         disposable.dispose();
     }
 
+    Dialog loadingDialog;
+
+    public void showLoadingDialog() {
+        if (loadingDialog != null) {
+            loadingDialog.show();
+            return;
+        }
+        loadingDialog = new Dialog(this,R.style.loading_dialog);
+        loadingDialog.setContentView(LayoutInflater.from(this).inflate(R.layout.dialog_loading, null));
+        loadingDialog.setCanceledOnTouchOutside(false);
+        loadingDialog.setCancelable(false);
+        loadingDialog.show();
+    }
+
+    public void  stopLoadingDialog(){
+        if (loadingDialog.isShowing())
+            loadingDialog.dismiss();
+
+    }
 
 }
